@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
-app = FastAPI(title="VKR Topic Service")
+app = FastAPI(title="VKR Auth Service")
 
 @app.get("/health")
-async def health():
-    return {"status": "ok", "service": "topic"}
+def health():
+    return {"status": "ok", "servdocker compose downice": "topic"}
