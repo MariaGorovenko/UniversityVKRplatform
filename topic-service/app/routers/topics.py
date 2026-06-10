@@ -97,16 +97,30 @@ def create_application(
     topic = db.query(Topic).filter(Topic.id == app_data.topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Тема не найдена")
-    existing = db.query(Application).filter(
+    student_id = str(current_user.get("id"))
+
+    existing_student_app = db.query(Application).filter(
+        Application.student_id == student_id,
+        Application.status != ApplicationStatus.REJECTED
+    ).first()
+
+    if existing_student_app:
+        raise HTTPException(
+            status_code=400,
+            detail="У вас уже есть активная заявка. Новую тему можно выбрать только после отклонения текущей заявки."
+        )
+
+    existing_topic_app = db.query(Application).filter(
         Application.topic_id == app_data.topic_id,
         Application.status != ApplicationStatus.REJECTED
     ).first()
-    if existing:
+
+    if existing_topic_app:
         raise HTTPException(status_code=400, detail="На эту тему уже подана заявка")
     student_code = generate_code()
     teacher_code = generate_code()
     new_app = Application(
-        student_id=current_user.get("id"),
+        student_id=student_id,
         topic_id=app_data.topic_id,
         student_code=student_code,
         teacher_code=teacher_code

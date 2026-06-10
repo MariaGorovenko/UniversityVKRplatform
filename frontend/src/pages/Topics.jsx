@@ -43,6 +43,12 @@ function Topics() {
     loadTopics();
   }, []);
 
+  const hasActiveApplication = topics.some(
+    (topic) =>
+      topic.my_application_status &&
+      topic.my_application_status !== 'rejected'
+  );
+
   const handleApply = async (topic) => {
     setApplyingId(topic.id);
     setError('');
@@ -108,6 +114,9 @@ function Topics() {
     }
     if (topic.is_taken) {
       return <span className="text-muted">—</span>;
+    }
+    if (hasActiveApplication) {
+      return <span className="text-muted">Недоступно</span>;
     }
     return (
       <Button
