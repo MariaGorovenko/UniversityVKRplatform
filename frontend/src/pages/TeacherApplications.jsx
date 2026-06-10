@@ -65,6 +65,7 @@ function TeacherApplications() {
           <thead>
             <tr>
               <th>Тема</th>
+              <th>Студент</th>
               <th>Статус</th>
               <th>Действие</th>
             </tr>
@@ -73,6 +74,7 @@ function TeacherApplications() {
             {apps.map((app) => (
               <tr key={app.id}>
                 <td>{app.topic_title}</td>
+                <td>{app.student_name || app.student_id}</td>
                 <td>
                   <Badge bg={app.status === 'approved' ? 'success' : 'warning'}>
                     {statusLabel[app.status] || app.status}

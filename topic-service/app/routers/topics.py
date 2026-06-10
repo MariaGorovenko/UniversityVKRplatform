@@ -20,6 +20,7 @@ import hashlib
 from io import BytesIO
 from fastapi.responses import StreamingResponse
 from docx import Document
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 SEND_EMAIL_CODES = os.getenv("SEND_EMAIL_CODES", "false").lower() == "true"
@@ -52,7 +53,12 @@ def list_topics(
     db: Session = Depends(get_db),
     current_user=Depends(get_optional_current_user),
 ):
-    topics = db.query(Topic).filter(Topic.status == "active").all()
+    query = db.query(Topic).filter(Topic.status == "active")
+
+    if current_user and current_user.get("role") == "teacher":
+        query = query.filter(Topic.teacher_id == str(current_user.get("id")))
+
+    topics = query.all()
     taken_topic_ids = {
         row[0]
         for row in db.query(Application.topic_id)
@@ -67,8 +73,17 @@ def list_topics(
             my_apps_by_topic[app.topic_id] = app
 
     result: list[TopicResponse] = []
+    teacher_ids = list({topic.teacher_id for topic in topics})
+
+    users = db.execute(
+        text("SELECT id::text, full_name FROM users WHERE id::text = ANY(:ids)"),
+        {"ids": teacher_ids}
+    ).all()
+
+    teacher_names = {user_id: full_name for user_id, full_name in users}
     for topic in topics:
         payload = TopicResponse.model_validate(topic)
+        payload.teacher_name = teacher_names.get(topic.teacher_id)
         payload.is_taken = topic.id in taken_topic_ids
         my_app = my_apps_by_topic.get(topic.id)
         if my_app:
@@ -159,12 +174,21 @@ def list_teacher_applications(
         .order_by(Application.created_at.desc())
         .all()
     )
+    student_ids = list({app.student_id for app, topic in rows})
+
+    users = db.execute(
+        text("SELECT id::text, full_name FROM users WHERE id::text = ANY(:ids)"),
+        {"ids": student_ids}
+    ).all()
+
+    student_names = {user_id: full_name for user_id, full_name in users}
     return [
         TeacherApplicationResponse(
             id=app.id,
             topic_id=app.topic_id,
             topic_title=topic.title,
             student_id=app.student_id,
+            student_name=student_names.get(app.student_id),
             status=app.status.value if hasattr(app.status, "value") else str(app.status),
             teacher_code=app.teacher_code,
         )

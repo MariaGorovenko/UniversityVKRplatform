@@ -172,6 +172,7 @@ function Topics() {
           <thead>
             <tr>
               <th>Тема</th>
+              {role === 'student' && <th>Преподаватель</th>}
               <th>Статус</th>
               {role === 'student' && <th>Действие</th>}
             </tr>
@@ -185,6 +186,7 @@ function Topics() {
                     <div className="text-muted small">{topic.description}</div>
                   )}
                 </td>
+                {role === 'student' && <td>{topic.teacher_name || '—'}</td>}
                 <td>
                   {role === 'student' ? (
                     renderStudentStatus(topic)

@@ -40,6 +40,7 @@ class TeacherApplicationResponse(BaseModel):
     topic_id: str
     topic_title: str
     student_id: str
+    student_name: Optional[str] = None
     status: str
     teacher_code: Optional[str] = None
 
