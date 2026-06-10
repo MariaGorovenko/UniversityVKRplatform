@@ -81,7 +81,15 @@ function Topics() {
 
   const renderStudentAction = (topic) => {
     if (topic.my_application_status === 'approved') {
-      return <Badge bg="success">Ваша тема</Badge>;
+      return (
+        <Button
+          size="sm"
+          variant="success"
+          onClick={() => downloadDocument(topic.my_application_id)}
+        >
+          Скачать заявление
+        </Button>
+      );
     }
     if (topic.my_application_status === 'created' && topic.my_application_id) {
       return (
@@ -112,6 +120,26 @@ function Topics() {
       </Button>
     );
   };
+
+  const downloadDocument = async (applicationId) => {
+  try {
+    const response = await api.get(
+      `/topic/api/topic/applications/${applicationId}/document`,
+      { responseType: 'blob' }
+    );
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'application.docx');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    setError(err.response?.data?.detail || 'Не удалось скачать заявление');
+  }
+};
 
   if (loading) return <div>Загрузка...</div>;
 

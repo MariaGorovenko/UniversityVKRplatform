@@ -16,6 +16,11 @@ import os
 import random
 import string
 
+import hashlib
+from io import BytesIO
+from fastapi.responses import StreamingResponse
+from docx import Document
+
 logger = logging.getLogger(__name__)
 SEND_EMAIL_CODES = os.getenv("SEND_EMAIL_CODES", "false").lower() == "true"
 
@@ -181,3 +186,67 @@ def confirm_code(
         raise HTTPException(status_code=403, detail="Нет прав")
     db.commit()
     return {"message": "Код подтверждён", "status": app.status.value}
+
+@router.get("/applications/{application_id}/document")
+def download_application_document(
+    application_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    app = db.query(Application).filter(Application.id == application_id).first()
+
+    if not app:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+
+    if app.status != ApplicationStatus.APPROVED:
+        raise HTTPException(status_code=400, detail="Документ доступен только после утверждения заявки")
+
+    topic = db.query(Topic).filter(Topic.id == app.topic_id).first()
+
+    if not topic:
+        raise HTTPException(status_code=404, detail="Тема не найдена")
+
+    user_id = str(current_user.get("id"))
+    role = current_user.get("role")
+
+    is_student = role == "student" and app.student_id == user_id
+    is_teacher = role == "teacher" and topic.teacher_id == user_id
+
+    if not (is_student or is_teacher):
+        raise HTTPException(status_code=403, detail="Нет доступа к документу")
+
+    student_hash = hashlib.sha256(app.student_code.encode()).hexdigest()
+    teacher_hash = hashlib.sha256(app.teacher_code.encode()).hexdigest()
+
+    document = Document()
+
+    document.add_heading("Заявление на утверждение темы ВКР", level=1)
+
+    document.add_paragraph(f"ID заявки: {app.id}")
+    document.add_paragraph(f"ID студента: {app.student_id}")
+    document.add_paragraph(f"ID преподавателя: {topic.teacher_id}")
+    document.add_paragraph(f"Тема ВКР: {topic.title}")
+
+    if topic.description:
+        document.add_paragraph(f"Описание темы: {topic.description}")
+
+    document.add_paragraph(f"Дата подтверждения студентом: {app.student_confirmed_at}")
+    document.add_paragraph(f"Дата подтверждения преподавателем: {app.teacher_confirmed_at}")
+
+    document.add_heading("Электронные подписи", level=2)
+    document.add_paragraph(f"Подпись студента: SHA256({app.student_code}) = {student_hash}")
+    document.add_paragraph(f"Подпись преподавателя: SHA256({app.teacher_code}) = {teacher_hash}")
+
+    file_stream = BytesIO()
+    document.save(file_stream)
+    file_stream.seek(0)
+
+    filename = f"application_{app.id}.docx"
+
+    return StreamingResponse(
+        file_stream,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )
